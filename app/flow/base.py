@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
-from app.agent.base import BaseAgent
+from app.agent.base import Agent 
 
 
 class FlowType(str, Enum):
@@ -14,7 +14,7 @@ class FlowType(str, Enum):
 class BaseFlow(BaseModel, ABC):
     """Base class for execution flows supporting multiple agents"""
 
-    agents: Dict[str, BaseAgent]
+    agents: Dict[str, Agent ]
     tools: Optional[List] = None
     primary_agent_key: Optional[str] = None
 
@@ -22,10 +22,10 @@ class BaseFlow(BaseModel, ABC):
         arbitrary_types_allowed = True
 
     def __init__(
-        self, agents: Union[BaseAgent, List[BaseAgent], Dict[str, BaseAgent]], **data
+        self, agents: Union[Agent , List[Agent ], Dict[str, Agent ]], **data
     ):
         # Handle different ways of providing agents
-        if isinstance(agents, BaseAgent):
+        if isinstance(agents, Agent ):
             agents_dict = {"default": agents}
         elif isinstance(agents, list):
             agents_dict = {f"agent_{i}": agent for i, agent in enumerate(agents)}
@@ -45,15 +45,15 @@ class BaseFlow(BaseModel, ABC):
         super().__init__(**data)
 
     @property
-    def primary_agent(self) -> Optional[BaseAgent]:
+    def primary_agent(self) -> Optional[Agent ]:
         """Get the primary agent for the flow"""
         return self.agents.get(self.primary_agent_key)
 
-    def get_agent(self, key: str) -> Optional[BaseAgent]:
+    def get_agent(self, key: str) -> Optional[Agent ]:
         """Get a specific agent by key"""
         return self.agents.get(key)
 
-    def add_agent(self, key: str, agent: BaseAgent) -> None:
+    def add_agent(self, key: str, agent: Agent ) -> None:
         """Add a new agent to the flow"""
         self.agents[key] = agent
 

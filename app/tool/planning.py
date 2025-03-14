@@ -1,9 +1,11 @@
-# tool/planning.py
-from typing import Dict, List, Literal, Optional
+# app/tool/planning.py
+import json
+import os
+from typing import Dict, List, Literal, Optional, ClassVar  # Import ClassVar
 
 from app.exceptions import ToolError
+from app.schema import Step  # Import the Step model
 from app.tool.base import BaseTool, ToolResult
-
 
 _PLANNING_TOOL_DESCRIPTION = """
 A planning tool that allows the agent to create and manage plans for solving complex tasks.
@@ -23,7 +25,7 @@ class PlanningTool(BaseTool):
         "type": "object",
         "properties": {
             "command": {
-                "description": "The command to execute. Available commands: create, update, list, get, set_active, mark_step, delete.",
+                "description": "The command to execute.  Available commands: create, update, list, get, set_active, mark_step, delete.",
                 "enum": [
                     "create",
                     "update",
@@ -66,8 +68,61 @@ class PlanningTool(BaseTool):
         "additionalProperties": False,
     }
 
-    plans: dict = {}  # Dictionary to store plans by plan_id
+    plans: Dict[str, Dict] = {}  # Dictionary to store plans by plan_id
     _current_plan_id: Optional[str] = None  # Track the current active plan
+    PLANS_DIR: ClassVar[str] = "plans"  # Directory to store plan files.  Now with ClassVar
+
+    def __init__(self):
+        super().__init__()
+        self._load_plans()
+
+    def _load_plans(self):
+        """Loads plans from JSON files in the plans directory."""
+        if not os.path.exists(self.PLANS_DIR):
+            try:
+                os.makedirs(self.PLANS_DIR)
+            except OSError as e:
+                raise ToolError(f"Failed to create plans directory: {e}")
+            return  # No plans to load yet
+
+        for filename in os.listdir(self.PLANS_DIR):
+            if filename.endswith(".json"):
+                plan_id = filename[:-5]  # Remove .json extension
+                filepath = os.path.join(self.PLANS_DIR, filename)
+                try:
+                    with open(filepath, "r") as f:
+                        plan_data = json.load(f)
+
+                        # Deserialize steps into Step objects
+                        plan_data["steps"] = [
+                            Step(**step_data) for step_data in plan_data["steps"]
+                        ]
+
+                    self.plans[plan_id] = plan_data
+                except (json.JSONDecodeError, OSError) as e:
+                    print(f"Error loading plan {plan_id} from {filename}: {e}")
+                    # Consider more robust error handling, like moving the corrupted file
+                except Exception as e:
+                    print(f"Unexpected Error: loading plan {plan_id} from {filename}: {e}")
+
+
+    def _save_plan(self, plan: Dict):
+        """Saves a plan to a JSON file."""
+        plan_id = plan["plan_id"]
+        filepath = os.path.join(self.PLANS_DIR, f"{plan_id}.json")
+
+        # Serialize steps to dictionaries
+        plan_data_to_save = plan.copy()  # Create copy so original object is not changed
+        plan_data_to_save["steps"] = [step.model_dump() for step in plan["steps"]]
+
+        try:
+            with open(filepath, "w") as f:
+                json.dump(plan_data_to_save, f, indent=4)
+        except OSError as e:
+            raise ToolError(f"Failed to save plan {plan_id}: {e}")
+        except Exception as e:
+            print(f"Unexpected Error: saving plan {plan_id}: {e}")
+
 
     async def execute(
         self,
@@ -141,20 +196,21 @@ class PlanningTool(BaseTool):
                 "Parameter `steps` must be a non-empty list of strings for command: create"
             )
 
-        # Create a new plan with initialized step statuses
-        plan = {
+        # Create a new plan with initialized step statuses, using Step objects
+        new_plan = {
             "plan_id": plan_id,
             "title": title,
-            "steps": steps,
-            "step_statuses": ["not_started"] * len(steps),
-            "step_notes": [""] * len(steps),
+            "steps": [
+                Step(description=step_description) for step_description in steps
+            ],  # Create Step instances
         }
 
-        self.plans[plan_id] = plan
+        self.plans[plan_id] = new_plan
         self._current_plan_id = plan_id  # Set as active plan
+        self._save_plan(new_plan) # save the plan
 
         return ToolResult(
-            output=f"Plan created successfully with ID: {plan_id}\n\n{self._format_plan(plan)}"
+            output=f"Plan created successfully with ID: {plan_id}\n\n{self._format_plan(new_plan)}"
         )
 
     def _update_plan(
@@ -180,28 +236,18 @@ class PlanningTool(BaseTool):
                     "Parameter `steps` must be a list of strings for command: update"
                 )
 
-            # Preserve existing step statuses for unchanged steps
-            old_steps = plan["steps"]
-            old_statuses = plan["step_statuses"]
-            old_notes = plan["step_notes"]
-
-            # Create new step statuses and notes
-            new_statuses = []
-            new_notes = []
-
-            for i, step in enumerate(steps):
-                # If the step exists at the same position in old steps, preserve status and notes
-                if i < len(old_steps) and step == old_steps[i]:
-                    new_statuses.append(old_statuses[i])
-                    new_notes.append(old_notes[i])
+            # Create new Step objects, preserving status/notes if possible
+            new_steps = []
+            for i, new_step_description in enumerate(steps):
+                if i < len(plan["steps"]) and plan["steps"][i].description == new_step_description:
+                    # Reuse the existing Step object
+                    new_steps.append(plan["steps"][i])
                 else:
-                    new_statuses.append("not_started")
-                    new_notes.append("")
+                    # Create a new Step object
+                    new_steps.append(Step(description=new_step_description))
 
-            plan["steps"] = steps
-            plan["step_statuses"] = new_statuses
-            plan["step_notes"] = new_notes
-
+            plan["steps"] = new_steps
+        self._save_plan(plan) # save the plan
         return ToolResult(
             output=f"Plan updated successfully: {plan_id}\n\n{self._format_plan(plan)}"
         )
@@ -216,9 +262,7 @@ class PlanningTool(BaseTool):
         output = "Available plans:\n"
         for plan_id, plan in self.plans.items():
             current_marker = " (active)" if plan_id == self._current_plan_id else ""
-            completed = sum(
-                1 for status in plan["step_statuses"] if status == "completed"
-            )
+            completed = sum(1 for step in plan["steps"] if step.status == "completed")
             total = len(plan["steps"])
             progress = f"{completed}/{total} steps completed"
             output += f"• {plan_id}{current_marker}: {plan['title']} - {progress}\n"
@@ -294,11 +338,11 @@ class PlanningTool(BaseTool):
             )
 
         if step_status:
-            plan["step_statuses"][step_index] = step_status
+            plan["steps"][step_index].status = step_status  # Update status on Step object
 
-        if step_notes:
-            plan["step_notes"][step_index] = step_notes
-
+        if step_notes is not None:  # Allow clearing notes by passing an empty string
+            plan["steps"][step_index].notes = step_notes  # Update notes on Step object
+        self._save_plan(plan) # save
         return ToolResult(
             output=f"Step {step_index} updated in plan '{plan_id}'.\n\n{self._format_plan(plan)}"
         )
@@ -310,6 +354,13 @@ class PlanningTool(BaseTool):
 
         if plan_id not in self.plans:
             raise ToolError(f"No plan found with ID: {plan_id}")
+
+        # Delete the plan file
+        filepath = os.path.join(self.PLANS_DIR, f"{plan_id}.json")
+        try:
+            os.remove(filepath)
+        except OSError as e:
+            raise ToolError(f"Failed to delete plan file for {plan_id}: {e}")
 
         del self.plans[plan_id]
 
@@ -326,14 +377,10 @@ class PlanningTool(BaseTool):
 
         # Calculate progress statistics
         total_steps = len(plan["steps"])
-        completed = sum(1 for status in plan["step_statuses"] if status == "completed")
-        in_progress = sum(
-            1 for status in plan["step_statuses"] if status == "in_progress"
-        )
-        blocked = sum(1 for status in plan["step_statuses"] if status == "blocked")
-        not_started = sum(
-            1 for status in plan["step_statuses"] if status == "not_started"
-        )
+        completed = sum(1 for step in plan["steps"] if step.status == "completed")
+        in_progress = sum(1 for step in plan["steps"] if step.status == "in_progress")
+        blocked = sum(1 for step in plan["steps"] if step.status == "blocked")
+        not_started = sum(1 for step in plan["steps"] if step.status == "not_started")
 
         output += f"Progress: {completed}/{total_steps} steps completed "
         if total_steps > 0:
@@ -346,18 +393,15 @@ class PlanningTool(BaseTool):
         output += "Steps:\n"
 
         # Add each step with its status and notes
-        for i, (step, status, notes) in enumerate(
-            zip(plan["steps"], plan["step_statuses"], plan["step_notes"])
-        ):
+        for i, step in enumerate(plan["steps"]):
             status_symbol = {
                 "not_started": "[ ]",
                 "in_progress": "[→]",
                 "completed": "[✓]",
                 "blocked": "[!]",
-            }.get(status, "[ ]")
-
-            output += f"{i}. {status_symbol} {step}\n"
-            if notes:
-                output += f"   Notes: {notes}\n"
+            }.get(step.status, "[ ]")  # Access status from Step object
+            output += f"{i}. {status_symbol} {step.description}\n"  # Access description from Step object
+            if step.notes:
+                output += f"    Notes: {step.notes}\n"  # Access notes from Step object
 
         return output

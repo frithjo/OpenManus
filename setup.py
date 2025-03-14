@@ -1,6 +1,5 @@
 from setuptools import find_packages, setup
 
-
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
@@ -33,6 +32,10 @@ setup(
         "aiofiles~=24.1.0",
         "pydantic_core~=2.27.2",
         "colorama~=0.4.6",
+        "baidusearch",  # Added baidusearch (which needs bs4)
+        "playwright",  # Added playwright
+        "beautifulsoup4", # added beautifulsoup4 just in case
+        "requests" # Added requests for proxy-man.py
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -1,193 +1,112 @@
+# app/agent/base.py
 from abc import ABC, abstractmethod
-from contextlib import asynccontextmanager
-from typing import List, Optional
+from typing import  Optional
 
-from pydantic import BaseModel, Field, model_validator
-
-from app.llm import LLM
+from app.llm import LLM  # Corrected import: Use the existing LLM class
 from app.logger import logger
-from app.schema import AgentState, Memory, Message, ROLE_TYPE
+from app.schema import AgentState, Memory, Message  # Corrected import
+from app.prompt.message import MessagePrompt # Corrected import
+from app.config import Config
 
 
-class BaseAgent(BaseModel, ABC):
-    """Abstract base class for managing agent state and execution.
+class Agent(ABC):
+    """
+    Abstract base class for all agents.
 
-    Provides foundational functionality for state transitions, memory management,
-    and a step-based execution loop. Subclasses must implement the `step` method.
+    An agent interacts with a user and/or tools to process requests.
     """
 
-    # Core attributes
-    name: str = Field(..., description="Unique name of the agent")
-    description: Optional[str] = Field(None, description="Optional agent description")
+    name: str
+    description: str
 
-    # Prompts
-    system_prompt: Optional[str] = Field(
-        None, description="System-level instruction prompt"
-    )
-    next_step_prompt: Optional[str] = Field(
-        None, description="Prompt for determining next action"
-    )
+    llm: LLM
+    memory: Memory = Memory()
+    state: AgentState = AgentState.IDLE
+    
 
-    # Dependencies
-    llm: LLM = Field(default_factory=LLM, description="Language model instance")
-    memory: Memory = Field(default_factory=Memory, description="Agent's memory store")
-    state: AgentState = Field(
-        default=AgentState.IDLE, description="Current agent state"
-    )
+    def __init__(self, llm: LLM, config:Config):
+        """Initialize the agent with an LLM."""
+        self.llm = llm
+        self.config = config
+        self.message_prompt : MessagePrompt = MessagePrompt(
+        """
+        {{- history -}}
+        {% if history -%}
+        {{user_input}}
+        {%- else -%}
+        {{user_input}}
+        {%- endif -%}
+        """)
 
-    # Execution control
-    max_steps: int = Field(default=10, description="Maximum steps before termination")
-    current_step: int = Field(default=0, description="Current step in execution")
+    @abstractmethod
+    async def think(self) -> bool:
+        """Decide what to do next."""
+        raise NotImplementedError
 
-    duplicate_threshold: int = 2
+    @abstractmethod
+    async def act(self) -> str:
+        """Do the action."""
+        raise NotImplementedError
 
-    class Config:
-        arbitrary_types_allowed = True
-        extra = "allow"  # Allow extra fields for flexibility in subclasses
-
-    @model_validator(mode="after")
-    def initialize_agent(self) -> "BaseAgent":
-        """Initialize agent with default settings if not provided."""
-        if self.llm is None or not isinstance(self.llm, LLM):
-            self.llm = LLM(config_name=self.name.lower())
-        if not isinstance(self.memory, Memory):
-            self.memory = Memory()
-        return self
-
-    @asynccontextmanager
-    async def state_context(self, new_state: AgentState):
-        """Context manager for safe agent state transitions.
+    async def run(self, request: Optional[str] = None) -> str:
+        """
+        Run the agent.
 
         Args:
-            new_state: The state to transition to during the context.
+            request: An optional initial user request or prompt.
 
-        Yields:
-            None: Allows execution within the new state.
-
-        Raises:
-            ValueError: If the new_state is invalid.
+        Returns:
+            str: The final result or output of the agent's execution.
         """
-        if not isinstance(new_state, AgentState):
-            raise ValueError(f"Invalid state: {new_state}")
+        if request:
+            self.update_memory("user", request)
+        step = 0
+        max_steps = 20  # Prevent infinite loops, set your own limit.
+        self.state = AgentState.RUNNING
+        result = ""
+        while self.state == AgentState.RUNNING and step < max_steps:
+            step += 1
+            logger.info(f"Executing step {step}/{max_steps}")
 
-        previous_state = self.state
-        self.state = new_state
-        try:
-            yield
-        except Exception as e:
-            self.state = AgentState.ERROR  # Transition to ERROR on failure
-            raise e
-        finally:
-            self.state = previous_state  # Revert to previous state
+            should_continue = await self.think()  # Check if we should continue
+            if not should_continue:
+                self.state = AgentState.FINISHED
+                break
+
+            result = await self.act()
+            if not result:
+                self.state = AgentState.IDLE
+                break
+
+            if result:
+                self.memory.add_message(self.message_prompt.assistant_message(content=result))
+
+        return result
 
     def update_memory(
         self,
-        role: ROLE_TYPE, # type: ignore
+        role: str,
         content: str,
         **kwargs,
     ) -> None:
-        """Add a message to the agent's memory.
+        """
+        Add a message to the agent's memory.
 
         Args:
-            role: The role of the message sender (user, system, assistant, tool).
-            content: The message content.
-            **kwargs: Additional arguments (e.g., tool_call_id for tool messages).
-
-        Raises:
-            ValueError: If the role is unsupported.
+            role: The role of the message (e.g., "user", "system", "assistant", "tool").
+            content: The content of the message.
+            **kwargs: Additional keyword arguments to be passed to the Message class.
         """
-        message_map = {
-            "user": Message.user_message,
-            "system": Message.system_message,
-            "assistant": Message.assistant_message,
-            "tool": lambda content, **kw: Message.tool_message(content, **kw),
-        }
 
-        if role not in message_map:
+        if role == "user":
+            msg = Message.user_message(content)
+        elif role == "system":
+            msg = Message.system_message(content)
+        elif role == "assistant":
+            msg = Message.assistant_message(content, **kwargs) #type: ignore
+        elif role == "tool":
+            msg = Message.tool_message(content=content, **kwargs)
+        else:
             raise ValueError(f"Unsupported message role: {role}")
 
-        msg_factory = message_map[role]
-        msg = msg_factory(content, **kwargs) if role == "tool" else msg_factory(content)
         self.memory.add_message(msg)
-
-    async def run(self, request: Optional[str] = None) -> str:
-        """Execute the agent's main loop asynchronously.
-
-        Args:
-            request: Optional initial user request to process.
-
-        Returns:
-            A string summarizing the execution results.
-
-        Raises:
-            RuntimeError: If the agent is not in IDLE state at start.
-        """
-        if self.state != AgentState.IDLE:
-            raise RuntimeError(f"Cannot run agent from state: {self.state}")
-
-        if request:
-            self.update_memory("user", request)
-
-        results: List[str] = []
-        async with self.state_context(AgentState.RUNNING):
-            while (
-                self.current_step < self.max_steps and self.state != AgentState.FINISHED
-            ):
-                self.current_step += 1
-                logger.info(f"Executing step {self.current_step}/{self.max_steps}")
-                step_result = await self.step()
-
-                # Check for stuck state
-                if self.is_stuck():
-                    self.handle_stuck_state()
-
-                results.append(f"Step {self.current_step}: {step_result}")
-
-            if self.current_step >= self.max_steps:
-                self.current_step = 0
-                self.state = AgentState.IDLE
-                results.append(f"Terminated: Reached max steps ({self.max_steps})")
-
-        return "\n".join(results) if results else "No steps executed"
-
-    @abstractmethod
-    async def step(self) -> str:
-        """Execute a single step in the agent's workflow.
-
-        Must be implemented by subclasses to define specific behavior.
-        """
-
-    def handle_stuck_state(self):
-        """Handle stuck state by adding a prompt to change strategy"""
-        stuck_prompt = "\
-        Observed duplicate responses. Consider new strategies and avoid repeating ineffective paths already attempted."
-        self.next_step_prompt = f"{stuck_prompt}\n{self.next_step_prompt}"
-        logger.warning(f"Agent detected stuck state. Added prompt: {stuck_prompt}")
-
-    def is_stuck(self) -> bool:
-        """Check if the agent is stuck in a loop by detecting duplicate content"""
-        if len(self.memory.messages) < 2:
-            return False
-
-        last_message = self.memory.messages[-1]
-        if not last_message.content:
-            return False
-
-        # Count identical content occurrences
-        duplicate_count = sum(
-            1
-            for msg in reversed(self.memory.messages[:-1])
-            if msg.role == "assistant" and msg.content == last_message.content
-        )
-
-        return duplicate_count >= self.duplicate_threshold
-
-    @property
-    def messages(self) -> List[Message]:
-        """Retrieve a list of messages from the agent's memory."""
-        return self.memory.messages
-
-    @messages.setter
-    def messages(self, value: List[Message]):
-        """Set the list of messages in the agent's memory."""
-        self.memory.messages = value

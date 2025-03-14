@@ -1,0 +1,54 @@
+{
+    "plan_id": "buy_bike_online",
+    "title": "Buy a Bike Online",
+    "steps": [
+        {
+            "description": "Research different types of bikes",
+            "status": "not_started",
+            "notes": "",
+            "tool_call": null
+        },
+        {
+            "description": "Determine budget",
+            "status": "not_started",
+            "notes": "",
+            "tool_call": null
+        },
+        {
+            "description": "Choose a reputable online store",
+            "status": "not_started",
+            "notes": "",
+            "tool_call": null
+        },
+        {
+            "description": "Select the desired bike model",
+            "status": "not_started",
+            "notes": "",
+            "tool_call": null
+        },
+        {
+            "description": "Check for available discounts or promotions",
+            "status": "not_started",
+            "notes": "",
+            "tool_call": null
+        },
+        {
+            "description": "Place the order",
+            "status": "not_started",
+            "notes": "",
+            "tool_call": null
+        },
+        {
+            "description": "Arrange for delivery",
+            "status": "not_started",
+            "notes": "",
+            "tool_call": null
+        },
+        {
+            "description": "Verify the bike upon delivery",
+            "status": "not_started",
+            "notes": "",
+            "tool_call": null
+        }
+    ]
+}

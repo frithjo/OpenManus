@@ -1,16 +1,15 @@
+# app/tool/python_execute.py
 import sys
 from io import StringIO
 import multiprocessing
-from typing import Dict
-
-from app.tool.base import BaseTool
+from app.tool.base import BaseTool, ToolResult
 
 
 class PythonExecute(BaseTool):
     """A tool for executing Python code with timeout and safety restrictions."""
 
     name: str = "python_execute"
-    description: str = "Executes Python code string. Note: Only print outputs are visible, function return values are not captured. Use print statements to see results."
+    description: str = "Executes Python code string. Returns both the stdout and the return value of the code. Use print statements for debugging, as those are captured in stdout."
     parameters: dict = {
         "type": "object",
         "properties": {
@@ -22,25 +21,30 @@ class PythonExecute(BaseTool):
         "required": ["code"],
     }
 
-    def _run_code(self, code: str, result_dict: dict, safe_globals: dict) -> None:
+    def _run_code(self, code: str, result_queue: multiprocessing.Queue, safe_globals: dict) -> None:
+        """Executes Python code in a sandboxed environment and captures stdout and return value."""
         original_stdout = sys.stdout
         try:
             output_buffer = StringIO()
-            sys.stdout = output_buffer
-            exec(code, safe_globals, safe_globals)
-            result_dict["observation"] = output_buffer.getvalue()
-            result_dict["success"] = True
+            sys.stdout = output_buffer  # Redirect stdout
+
+            # Execute the code and capture the return value
+            locales = {}
+            exec(code, safe_globals, locales)
+            return_value = locales.get("result", None)  # Capture return value from 'result' variable
+
+            result_queue.put((return_value, output_buffer.getvalue(), True))  # Send both
+
         except Exception as e:
-            result_dict["observation"] = str(e)
-            result_dict["success"] = False
+            result_queue.put((None, str(e), False))  # Send error information
         finally:
-            sys.stdout = original_stdout
+            sys.stdout = original_stdout  # Restore stdout
 
     async def execute(
         self,
         code: str,
-        timeout: int = 5,
-    ) -> Dict:
+        timeout: int = 5, # Added type hint
+    ) -> ToolResult:
         """
         Executes the provided Python code with a timeout.
 
@@ -49,31 +53,38 @@ class PythonExecute(BaseTool):
             timeout (int): Execution timeout in seconds.
 
         Returns:
-            Dict: Contains 'output' with execution output or error message and 'success' status.
+            ToolResult: Contains 'output' with the return value, 'stdout' with the standard output, and 'success' status.
         """
-
         with multiprocessing.Manager() as manager:
-            result = manager.dict({
-                "observation": "",
-                "success": False
-            })
+            result_queue = manager.Queue()  # Use a Queue for communication
+
             if isinstance(__builtins__, dict):
                 safe_globals = {"__builtins__": __builtins__}
             else:
                 safe_globals = {"__builtins__": __builtins__.__dict__.copy()}
+
             proc = multiprocessing.Process(
                 target=self._run_code,
-                args=(code, result, safe_globals)
+                args=(code, result_queue, safe_globals)
             )
             proc.start()
             proc.join(timeout)
 
-            # timeout process
             if proc.is_alive():
                 proc.terminate()
-                proc.join(1)
-                return {
-                    "observation": f"Execution timeout after {timeout} seconds",
-                    "success": False,
-                }
-            return dict(result)
+                proc.join(1)  # Ensure termination
+                return ToolResult(
+                    output=None,
+                    error=f"Execution timed out after {timeout} seconds",
+                    system=f"Execution timed out after {timeout} seconds" #Added system message
+                )
+
+            try:
+                return_value, stdout, success = result_queue.get(block=False)  # Non-blocking get
+                if success:
+                    return ToolResult(output=return_value, system=stdout) #stdout saved in system
+                else:
+                    return ToolResult(output=None, error=stdout, system=stdout) #stdout saved in system
+
+            except Exception:
+                return ToolResult(output=None, error="Failed to retrieve results from subprocess.")

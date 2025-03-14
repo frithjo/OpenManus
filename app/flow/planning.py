@@ -4,11 +4,11 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import Field
 
-from app.agent.base import BaseAgent
+from app.agent.base import Agent 
 from app.flow.base import BaseFlow, PlanStepStatus
 from app.llm import LLM
 from app.logger import logger
-from app.schema import AgentState, Message, ToolChoice
+from app.schema import AgentState, MESSAGE_PROMPT, ToolChoice
 from app.tool import PlanningTool
 
 
@@ -22,7 +22,7 @@ class PlanningFlow(BaseFlow):
     current_step_index: Optional[int] = None
 
     def __init__(
-        self, agents: Union[BaseAgent, List[BaseAgent], Dict[str, BaseAgent]], **data
+        self, agents: Union[Agent , List[Agent ], Dict[str, Agent ]], **data
     ):
         # Set executor keys before super().__init__
         if "executors" in data:
@@ -44,7 +44,7 @@ class PlanningFlow(BaseFlow):
         if not self.executor_keys:
             self.executor_keys = list(self.agents.keys())
 
-    def get_executor(self, step_type: Optional[str] = None) -> BaseAgent:
+    def get_executor(self, step_type: Optional[str] = None) -> Agent :
         """
         Get an appropriate executor agent for the current step.
         Can be extended to select agents based on step type/requirements.
@@ -108,14 +108,14 @@ class PlanningFlow(BaseFlow):
         logger.info(f"Creating initial plan with ID: {self.active_plan_id}")
 
         # Create a system message for plan creation
-        system_message = Message.system_message(
+        system_message = MESSAGE_PROMPT.system_message(
             "You are a planning assistant. Create a concise, actionable plan with clear steps. "
             "Focus on key milestones rather than detailed sub-steps. "
             "Optimize for clarity and efficiency."
         )
 
         # Create a user message with the request
-        user_message = Message.user_message(
+        user_message = MESSAGE_PROMPT.user_message(
             f"Create a reasonable plan with clear steps to accomplish the task: {request}"
         )
 
@@ -226,7 +226,7 @@ class PlanningFlow(BaseFlow):
             logger.warning(f"Error finding current step index: {e}")
             return None, None
 
-    async def _execute_step(self, executor: BaseAgent, step_info: dict) -> str:
+    async def _execute_step(self, executor: Agent , step_info: dict) -> str:
         """Execute the current step with the specified agent using agent.run()."""
         # Prepare context for the agent with current plan status
         plan_status = await self._get_plan_text()
@@ -361,11 +361,11 @@ class PlanningFlow(BaseFlow):
 
         # Create a summary using the flow's LLM directly
         try:
-            system_message = Message.system_message(
+            system_message = MESSAGE_PROMPT.system_message(
                 "You are a planning assistant. Your task is to summarize the completed plan."
             )
 
-            user_message = Message.user_message(
+            user_message = MESSAGE_PROMPT.user_message(
                 f"The plan has been completed. Here is the final plan status:\n\n{plan_text}\n\nPlease provide a summary of what was accomplished and any final thoughts."
             )
 

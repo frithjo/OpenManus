@@ -1,0 +1,12 @@
+{{ format_instructions | default('') }}
+{{json_start | default('')}}
+Response:
+{
+    "tool_name": "the name of the tool to use",
+    "tool_input": {
+        "arg1": "value1",
+        "arg2": "value2"
+    }
+}
+{{json_end | default('')}}
+Tool Description: {{ tool_description }}

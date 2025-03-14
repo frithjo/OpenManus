@@ -1,25 +1,32 @@
-from app.tool.base import BaseTool
-
-
-_TERMINATE_DESCRIPTION = """Terminate the interaction when the request is met OR if the assistant cannot proceed further with the task.
-When you have finished all the tasks, call this tool to end the work."""
+#app/tool/terminate.py
+from app.tool.base import BaseTool, ToolResult
 
 
 class Terminate(BaseTool):
+    """
+    A tool that can be used to terminate the conversation.
+    """
+
     name: str = "terminate"
-    description: str = _TERMINATE_DESCRIPTION
+    description: str = "Terminates the conversation."
     parameters: dict = {
         "type": "object",
         "properties": {
             "status": {
                 "type": "string",
-                "description": "The finish status of the interaction.",
+                "description": "Whether the conversation was successfully completed or not.",
                 "enum": ["success", "failure"],
-            }
+            },
+            "reason": {
+                "type": "string",
+                "description": "Reason for completing/failing the conversation.",
+            },
         },
-        "required": ["status"],
+         "required": ["status", "reason"],
     }
 
-    async def execute(self, status: str) -> str:
-        """Finish the current execution"""
-        return f"The interaction has been completed with status: {status}"
+    async def execute(self, status: str, reason: str) -> ToolResult:
+        """Terminate the conversation."""
+        return ToolResult(
+            output=f"The interaction has been completed with status: {status}\n{reason}"
+        )

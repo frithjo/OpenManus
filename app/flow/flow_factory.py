@@ -1,6 +1,6 @@
 from typing import Dict, List, Union
 
-from app.agent.base import BaseAgent
+from app.agent.base import Agent 
 from app.flow.base import BaseFlow, FlowType
 from app.flow.planning import PlanningFlow
 
@@ -11,7 +11,7 @@ class FlowFactory:
     @staticmethod
     def create_flow(
         flow_type: FlowType,
-        agents: Union[BaseAgent, List[BaseAgent], Dict[str, BaseAgent]],
+        agents: Union[Agent , List[Agent ], Dict[str, Agent ]],
         **kwargs,
     ) -> BaseFlow:
         flows = {

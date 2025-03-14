@@ -1,3 +1,4 @@
+# app/tool/browser_use_tool.py
 import asyncio
 import json
 from typing import Optional
@@ -10,6 +11,7 @@ from pydantic import Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
 from app.config import config
+from app.logger import logger
 from app.tool.base import BaseTool, ToolResult
 
 
@@ -218,7 +220,7 @@ class BrowserUseTool(BaseTool):
                     screenshot = await context.take_screenshot(full_page=True)
                     return ToolResult(
                         output=f"Screenshot captured (base64 length: {len(screenshot)})",
-                        system=screenshot,
+                        system=screenshot,  # Include the base64 data in 'system'
                     )
 
                 elif action == "get_html":
@@ -229,21 +231,14 @@ class BrowserUseTool(BaseTool):
                     return ToolResult(output=truncated)
 
                 elif action == "get_text":
-                    text = await context.execute_javascript("document.body.innerText")
-                    return ToolResult(output=text)
-
-                elif action == "read_links":
-                    links = await context.execute_javascript(
-                        "document.querySelectorAll('a[href]').forEach((elem) => {if (elem.innerText) {console.log(elem.innerText, elem.href)}})"
-                    )
-                    return ToolResult(output=links)
+                    text = await context.get_page_text()
+                    truncated = text[:MAX_LENGTH] + "..." if len(text) > MAX_LENGTH else text
+                    return ToolResult(output=truncated)
 
                 elif action == "execute_js":
                     if not script:
-                        return ToolResult(
-                            error="Script is required for 'execute_js' action"
-                        )
-                    result = await context.execute_javascript(script)
+                        return ToolResult(error="Script is required for 'execute_js' action")
+                    result = await context.evaluate_js(script)
                     return ToolResult(output=str(result))
 
                 elif action == "scroll":
@@ -251,75 +246,48 @@ class BrowserUseTool(BaseTool):
                         return ToolResult(
                             error="Scroll amount is required for 'scroll' action"
                         )
-                    await context.execute_javascript(
-                        f"window.scrollBy(0, {scroll_amount});"
-                    )
-                    direction = "down" if scroll_amount > 0 else "up"
-                    return ToolResult(
-                        output=f"Scrolled {direction} by {abs(scroll_amount)} pixels"
-                    )
+                    await context.scroll(scroll_amount)
+                    return ToolResult(output=f"Scrolled by {scroll_amount} pixels")
 
                 elif action == "switch_tab":
                     if tab_id is None:
-                        return ToolResult(
-                            error="Tab ID is required for 'switch_tab' action"
-                        )
+                        return ToolResult(error="Tab ID is required for 'switch_tab' action")
                     await context.switch_to_tab(tab_id)
                     return ToolResult(output=f"Switched to tab {tab_id}")
 
                 elif action == "new_tab":
                     if not url:
                         return ToolResult(error="URL is required for 'new_tab' action")
-                    await context.create_new_tab(url)
+                    await context.new_tab(url)
                     return ToolResult(output=f"Opened new tab with URL {url}")
 
                 elif action == "close_tab":
-                    await context.close_current_tab()
+                    await context.close_tab()
                     return ToolResult(output="Closed current tab")
 
                 elif action == "refresh":
-                    await context.refresh_page()
-                    return ToolResult(output="Refreshed current page")
+                    await context.refresh()
+                    return ToolResult(output="Refreshed current tab")
+                elif action == 'read_links':
+                    links = await context.get_links()
+                    return ToolResult(output=json.dumps(links))
 
                 else:
-                    return ToolResult(error=f"Unknown action: {action}")
+                    return ToolResult(error=f"Unsupported action: {action}")
 
             except Exception as e:
-                return ToolResult(error=f"Browser action '{action}' failed: {str(e)}")
+                logger.exception(f"Error during browser operation: {e}")
+                return ToolResult(error=str(e))
 
-    async def get_current_state(self) -> ToolResult:
-        """Get the current browser state as a ToolResult."""
-        async with self.lock:
-            try:
-                context = await self._ensure_browser_initialized()
-                state = await context.get_state()
-                state_info = {
-                    "url": state.url,
-                    "title": state.title,
-                    "tabs": [tab.model_dump() for tab in state.tabs],
-                    "interactive_elements": state.element_tree.clickable_elements_to_string(),
-                }
-                return ToolResult(output=json.dumps(state_info))
-            except Exception as e:
-                return ToolResult(error=f"Failed to get browser state: {str(e)}")
+            finally:
+                await self.cleanup() #cleanup after every execute
+
 
     async def cleanup(self):
-        """Clean up browser resources."""
-        async with self.lock:
-            if self.context is not None:
-                await self.context.close()
-                self.context = None
-                self.dom_service = None
-            if self.browser is not None:
-                await self.browser.close()
-                self.browser = None
-
-    def __del__(self):
-        """Ensure cleanup when object is destroyed."""
-        if self.browser is not None or self.context is not None:
-            try:
-                asyncio.run(self.cleanup())
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                loop.run_until_complete(self.cleanup())
-                loop.close()
+        """Clean up browser and context."""
+        if self.context:
+            await self.context.close()
+            self.context = None
+        if self.browser:
+            await self.browser.close()
+            self.browser = None

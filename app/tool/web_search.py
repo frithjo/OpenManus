@@ -1,63 +1,66 @@
-import asyncio
-from typing import List
+# app/tool/web_search.py
+import json
+from typing import Dict
 
-from app.tool.base import BaseTool
-from app.config import config
-from app.tool.search import WebSearchEngine, BaiduSearchEngine, GoogleSearchEngine, DuckDuckGoSearchEngine
+from pydantic import Field
 
+from app.logger import logger
+from app.tool.base import BaseTool, ToolResult
+#from app.tool.serper_api_wrapper import SerperAPIWrapper  # Remove relative import
+from app.tool import SerperAPIWrapper # Changed.
 
 class WebSearch(BaseTool):
+    """A tool for performing web searches."""
+
     name: str = "web_search"
-    description: str = """Perform a web search and return a list of relevant links.
-Use this tool when you need to find information on the web, get up-to-date data, or research specific topics.
-The tool returns a list of URLs that match the search query.
-"""
+    description: str = (
+        "A tool for performing web searches. "
+        "It's useful for finding information on the internet. "
+        "Input should be the query."
+    )
     parameters: dict = {
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "(required) The search query to submit to the search engine.",
-            },
-            "num_results": {
-                "type": "integer",
-                "description": "(optional) The number of search results to return. Default is 10.",
-                "default": 10,
+                "description": "The search query.",
             },
         },
         "required": ["query"],
     }
-    _search_engine: dict[str, WebSearchEngine] = {
-        "google": GoogleSearchEngine(),
-        "baidu": BaiduSearchEngine(),
-        "duckduckgo": DuckDuckGoSearchEngine(),
-    }
 
-    async def execute(self, query: str, num_results: int = 10) -> List[str]:
-        """
-        Execute a Web search and return a list of URLs.
+    api_wrapper: SerperAPIWrapper = Field(default_factory=SerperAPIWrapper)
 
-        Args:
-            query (str): The search query to submit to the search engine.
-            num_results (int, optional): The number of search results to return. Default is 10.
+    async def execute(self, query: str) -> ToolResult: # Changed.
+        """Execute the web search tool."""
 
-        Returns:
-            List[str]: A list of URLs matching the search query.
-        """
-        # Run the search in a thread pool to prevent blocking
-        loop = asyncio.get_event_loop()
-        search_engine = self.get_search_engine()
-        links = await loop.run_in_executor(
-            None, lambda: list(search_engine.perform_search(query, num_results=num_results))
-        )
+        logger.info(f"Searching the web for: {query}")
+        try:
+            # SerperAPIWrapper's search method returns a JSON string.
+            search_results_json = await self.api_wrapper.results(query) # Changed
+            search_results = json.loads(search_results_json)
 
-        return links
-
-    def get_search_engine(self) -> WebSearchEngine:
-        """Determines the search engine to use based on the configuration."""
-        default_engine = self._search_engine.get("google")
-        if config.search_config is None:
-            return default_engine
-        else:
-            engine = config.search_config.engine.lower()
-            return self._search_engine.get(engine, default_engine)
+             # Check for errors in the Serper API response.  This is important
+            # because the Serper API can return error messages *within* a
+            # successful HTTP response (status code 200).
+            if "error" in search_results:
+                return ToolResult(
+                    output=None,
+                    error=search_results["error"],
+                )
+            # Extract organic results, handling potential KeyError
+            organic_results = search_results.get("organic", [])
+            if not organic_results:
+                return ToolResult(
+                    output="No organic search results found.",
+                    error=None
+                    )
+            # If we got here, we have successful results, we need to return those
+            result_links = [result["link"] for result in organic_results] #extract just the links
+            return ToolResult(
+                    output=result_links, #return the links
+                    error=None
+                )
+        except Exception as e:
+            logger.exception(f"Error during web search: {e}")
+            return ToolResult(output=None, error=str(e))

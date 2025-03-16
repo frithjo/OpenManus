@@ -1,4 +1,4 @@
-#app/tool/terminate.py
+# app/tool/terminate.py
 from app.tool.base import BaseTool, ToolResult
 
 
@@ -22,7 +22,7 @@ class Terminate(BaseTool):
                 "description": "Reason for completing/failing the conversation.",
             },
         },
-         "required": ["status", "reason"],
+        "required": ["status", "reason"],
     }
 
     async def execute(self, status: str, reason: str) -> ToolResult:

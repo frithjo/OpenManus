@@ -1,8 +1,8 @@
 import json
 from enum import Enum
-from typing import Any, List, Literal, Optional, Dict, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, root_validator, validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class Role(str, Enum):
@@ -126,7 +126,9 @@ class Message(BaseModel):
     @classmethod
     def tool_message(cls, content: str, tool_call_id: str, name: str) -> "Message":
         """Creates a tool message."""
-        return cls(role=Role.TOOL, content=content, tool_call_id=tool_call_id, name=name)
+        return cls(
+            role=Role.TOOL, content=content, tool_call_id=tool_call_id, name=name
+        )
 
     def __str__(self) -> str:
         """Provides a human-readable representation of the message."""
@@ -145,7 +147,9 @@ class Memory(BaseModel):
         """Adds a message to the history."""
         self.messages.append(message)
         if len(self.messages) > self.max_messages:
-            self.messages = self.messages[-self.max_messages:]  # Keep only the last max_messages
+            self.messages = self.messages[
+                -self.max_messages :
+            ]  # Keep only the last max_messages
 
     def clear(self):
         """Clears the conversation history."""
@@ -164,7 +168,9 @@ class Step(BaseModel):
     """Represents a step in a plan."""
 
     description: str
-    status: Literal["not_started", "in_progress", "completed", "blocked"] = "not_started"
+    status: Literal[
+        "not_started", "in_progress", "completed", "blocked"
+    ] = "not_started"
     notes: str = ""
     # Consider changing this field to a specific type (e.g., ToolCall) if your steps always reference a tool call.
     tool_call: Optional[Dict[str, Any]] = None

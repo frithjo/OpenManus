@@ -1,6 +1,8 @@
-#app/prompt/base.py
+# app/prompt/base.py
 from typing import Any, List, Optional
-from jinja2 import Environment, FileSystemLoader, meta, Undefined
+
+from jinja2 import Environment, meta
+
 
 class PromptTemplate:
     """
@@ -36,7 +38,9 @@ class PromptTemplate:
         # Check for invalid variables (variables used in template but not in input_variables)
         parsed_content = self.env.parse(template)
         undefined_variables = meta.find_undeclared_variables(parsed_content)
-        invalid_variables = [v for v in undefined_variables if v not in self.input_variables]
+        invalid_variables = [
+            v for v in undefined_variables if v not in self.input_variables
+        ]
         if invalid_variables:
             raise ValueError(f"Invalid variables used in template: {invalid_variables}")
 
@@ -69,7 +73,9 @@ class PromptTemplate:
         # Check for extra variables (variables provided but not in input_variables)
         extra_vars = [var for var in kwargs if var not in self.input_variables]
         if extra_vars:
-            print(f"Extra variables provided that are not in input_variables: {extra_vars}")
+            print(
+                f"Extra variables provided that are not in input_variables: {extra_vars}"
+            )
             # Remove extra variables
             for var in extra_vars:
                 kwargs.pop(var)
@@ -78,6 +84,8 @@ class PromptTemplate:
             try:
                 return self.template.render(**kwargs)
             except Exception as e:
-                raise ValueError(f"Error rendering template: {e}, {kwargs} , {self.input_variables}")
+                raise ValueError(
+                    f"Error rendering template: {e}, {kwargs} , {self.input_variables}"
+                )
 
         return await _render_async()

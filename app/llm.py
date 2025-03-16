@@ -1,17 +1,20 @@
 import os
-from typing import List, Optional, Dict, Any, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from openai import AsyncOpenAI
+from openai import AzureOpenAI as AsyncAzureOpenAI
 from openai.types.chat import ChatCompletionMessageToolCall
 from tenacity import retry, stop_after_attempt, wait_random_exponential
-from openai import AzureOpenAI as AsyncAzureOpenAI
-from app.schema import Message, ToolCall  # Import Message and ToolCall
+
 from app.config import Config  # Import Config (not config instance)
 from app.logger import logger
+from app.schema import Message, ToolCall  # Import Message and ToolCall
 
 
 def get_tool_calls(
-    calls: Union[ChatCompletionMessageToolCall, List[ChatCompletionMessageToolCall], None]
+    calls: Union[
+        ChatCompletionMessageToolCall, List[ChatCompletionMessageToolCall], None
+    ]
 ) -> List[ToolCall]:
     """
     Convert tool call data from the OpenAI API response to a list of ToolCall objects.
@@ -36,7 +39,10 @@ def get_tool_calls(
             ToolCall(
                 id=getattr(call, "id", "function_call"),
                 type=call.type,
-                function={"name": call.function.name, "arguments": call.function.arguments},
+                function={
+                    "name": call.function.name,
+                    "arguments": call.function.arguments,
+                },
             )
         )
     return converted_calls
@@ -57,7 +63,7 @@ class LLM:
         """
         # Determine if using Azure or standard OpenAI endpoint
         if config.llm.get("api_type") == "azure":
-            api_type = config.llm["default"].api_type
+            config.llm["default"].api_type
             api_version = config.llm["default"].api_version
             base_url = config.llm["default"].base_url
             api_key = config.llm["default"].api_key or os.getenv("OPENAI_API_KEY")
@@ -148,7 +154,10 @@ class LLM:
 
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
     async def ask_tool(
-        self, messages: List[Message], tools: List[Dict[str, Any]], system_msgs: Optional[List[Message]] = None
+        self,
+        messages: List[Message],
+        tools: List[Dict[str, Any]],
+        system_msgs: Optional[List[Message]] = None,
     ) -> Tuple[Message, List[ToolCall]]:
         """
         Ask the LLM a question with functions (tools) enabled and return both the response and any tool calls.

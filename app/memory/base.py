@@ -1,8 +1,9 @@
 # app/memory/base.py
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 from app.schema import Message  # Import the Message class
+
 
 class BaseMemory(ABC):
     """

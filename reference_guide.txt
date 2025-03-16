@@ -1,0 +1,98 @@
+app/agent/base.py:
+The Agent class is well-structured, with think, act, and run methods.
+The update_memory method is correctly implemented.
+The message_prompt attribute is used to format messages.
+app/agent/planning.py:
+The PlanningAgent is designed to create and manage plans.
+The think and act methods are implemented to handle planning steps.
+The create_initial_plan method is used to create the initial plan.
+The _get_current_step_index method is used to get the current step index.
+The update_plan_status method is used to update the plan status.
+app/agent/toolcall.py:
+The ToolCallAgent is designed to use tools.
+The think and act methods are implemented to handle tool calls.
+The execute_tool_calls method is used to execute tool calls.
+The _handle_special_tool method is used to handle special tools.
+app/tool/tool_collection.py:
+The ToolCollection class is used to manage a collection of tools.
+The execute method is used to execute a tool.
+The get_tool_descriptions method is used to get the tool descriptions.
+app/tool/__init__.py:
+The Terminate tool is defined.
+All the tools are exported.
+main.py:
+The main function is used to run the agent.
+The shutdown_agent function is used to perform cleanup.
+The signal handling is implemented.
+app/llm.py:
+The LLM class is used to interact with the OpenAI API.
+The ask and ask_tool methods are used to send messages to the LLM.
+The format_messages method is used to format messages.
+app/schema.py:
+The Message, ToolCall, FunctionCall, Role, ToolChoice, AgentState, Memory, and Step classes are defined.
+The to_chat_completion_message method is used to convert a Message to the format expected by the OpenAI API.
+app/prompt/prompt_formatter.py:
+The format_prompt function is used to format a prompt template using Jinja2.
+app/agent/manus.py:
+The Manus agent is defined.
+The _handle_special_tool method is used to handle special tools.
+app/memory/base.py:
+The BaseMemory and SimpleMemory classes are defined.
+The get_memory function is used to create a memory instance.
+app/prompt/message.py:
+The MessagePrompt class is used to create and manage message prompts.
+app/prompt/tool_use.py:
+The TOOL_DESCRIPTION, FORMAT_INSTRUCTIONS, JSON_START, and JSON_END variables are defined.
+app/prompt/__init__.py:
+All the prompts are exported.
+app/memory/__init__.py:
+All the memory are exported.
+app/exceptions.py:
+The ToolError, AgentError, LLMError, MemoryError, and SchemaError exceptions are defined.
+app/agent/__init__.py:
+All the agents are exported.
+app/tool/terminal.py:
+The Terminal tool is defined.
+The execute method is used to execute a terminal command.
+The execute_in_env method is used to execute a terminal command in a conda environment.
+The _handle_cd_command method is used to handle the cd command.
+The _sanitize_command method is used to sanitize the command.
+The close method is used to close the terminal.
+app/tool/web_search.py:
+The WebSearch tool is defined.
+The execute method is used to execute a web search.
+app/tool/python_execute.py:
+The PythonExecute tool is defined.
+The execute method is used to execute python code.
+The _run_code method is used to execute the code.
+app/tool/browser_use_tool.py:
+The BrowserUseTool tool is defined.
+The execute method is used to execute a browser action.
+The cleanup method is used to clean up the browser.
+The _ensure_browser_initialized method is used to ensure the browser is initialized.
+My Task:
+
+Update REFERENCE_GUIDE.md: Update the REFERENCE_GUIDE.md file to include:
+Intuitive Relationship and Dependency Tree: Create a clear and intuitive representation of the relationships and dependencies between all components in the project.
+Comprehensive Component Documentation: Ensure all components (files, classes, methods) are documented in the guide.
+Tagging System: Maintain the tagging system for "pins" and "locks" to track modifications.
+Modification Tracking: Document all modifications made to each file, class, and method, using the tagging system.
+Update the documentation: Update the documentation to reflect the current state of the project.
+Pin and Lock Approach: Strictly adhere to the "pin and lock" approach.
+Full File Content: Output the full content of REFERENCE_GUIDE.md.
+Explanation: Provide a detailed explanation of the changes and the reasoning behind them.
+Check for Cascading Changes: Check for any potential cascading changes due to the updates.
+Ask for Test: Ask for testing after the changes.
+End: Ask if we are done.
+My Approach:
+
+Re-analyze Project: I will re-analyze the entire project, paying close attention to the relationships and dependencies between components.
+Dependency Tree: I will update the dependency tree to visualize how components rely on each other.
+Update REFERENCE_GUIDE.md: I will update the REFERENCE_GUIDE.md file with the following:
+Dependency Tree: Update the dependency tree.
+Component Documentation: Ensure all components are documented, including their purpose, relationships, and dependencies.
+Tagging System: Use the tagging system to indicate "pinned" and "locked" components.
+Modification Tracking: Document all modifications made so far, using the tagging system.
+Update the documentation: Update the documentation to reflect the current state of the project.
+Systemic Analysis: Before making any change, I will analyze its potential impact on the entire system.
+Incremental Changes: I will make changes incrementally, testing each change to ensure it's correct.

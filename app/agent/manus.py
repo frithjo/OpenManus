@@ -1,4 +1,4 @@
-# app/agent/manus.pyfrom pydantic import Field
+# app/agent/manus.py
 from app.agent.toolcall import ToolCallAgent
 from app.config import Config
 from app.llm import LLM
@@ -17,7 +17,9 @@ class Manus(ToolCallAgent):
     """
 
     name: str = "Manus"
-    description: str = "A versatile agent that can solve various tasks using multiple tools"
+    description: str = (
+        "A versatile agent that can solve various tasks using multiple tools"
+    )
 
     system_prompt: str = SYSTEM_PROMPT  # Use the imported prompts
     next_step_prompt: str = NEXT_STEP_PROMPT
@@ -47,7 +49,7 @@ class Manus(ToolCallAgent):
             available_tools=ToolCollection(tools),
             system_prompt=self.system_prompt,
             next_step_prompt=self.next_step_prompt,
-            config=config
+            config=config,
         )
 
     async def _handle_special_tool(self, tool_call: ToolCall):

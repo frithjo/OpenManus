@@ -4,11 +4,11 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import Field
 
-from app.agent.base import Agent 
+from app.agent.base import Agent
 from app.flow.base import BaseFlow, PlanStepStatus
 from app.llm import LLM
 from app.logger import logger
-from app.schema import AgentState, MESSAGE_PROMPT, ToolChoice
+from app.schema import MESSAGE_PROMPT, AgentState, ToolChoice
 from app.tool import PlanningTool
 
 
@@ -21,9 +21,7 @@ class PlanningFlow(BaseFlow):
     active_plan_id: str = Field(default_factory=lambda: f"plan_{int(time.time())}")
     current_step_index: Optional[int] = None
 
-    def __init__(
-        self, agents: Union[Agent , List[Agent ], Dict[str, Agent ]], **data
-    ):
+    def __init__(self, agents: Union[Agent, List[Agent], Dict[str, Agent]], **data):
         # Set executor keys before super().__init__
         if "executors" in data:
             data["executor_keys"] = data.pop("executors")
@@ -44,7 +42,7 @@ class PlanningFlow(BaseFlow):
         if not self.executor_keys:
             self.executor_keys = list(self.agents.keys())
 
-    def get_executor(self, step_type: Optional[str] = None) -> Agent :
+    def get_executor(self, step_type: Optional[str] = None) -> Agent:
         """
         Get an appropriate executor agent for the current step.
         Can be extended to select agents based on step type/requirements.
@@ -226,7 +224,7 @@ class PlanningFlow(BaseFlow):
             logger.warning(f"Error finding current step index: {e}")
             return None, None
 
-    async def _execute_step(self, executor: Agent , step_info: dict) -> str:
+    async def _execute_step(self, executor: Agent, step_info: dict) -> str:
         """Execute the current step with the specified agent using agent.run()."""
         # Prepare context for the agent with current plan status
         plan_status = await self._get_plan_text()

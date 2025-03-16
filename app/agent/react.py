@@ -3,12 +3,12 @@ from typing import Optional
 
 from pydantic import Field
 
-from app.agent.base import Agent 
+from app.agent.base import Agent
 from app.llm import LLM
 from app.schema import AgentState, Memory
 
 
-class ReActAgent(Agent , ABC):
+class ReActAgent(Agent, ABC):
     name: str
     description: Optional[str] = None
 

@@ -232,12 +232,16 @@ class BrowserUseTool(BaseTool):
 
                 elif action == "get_text":
                     text = await context.get_page_text()
-                    truncated = text[:MAX_LENGTH] + "..." if len(text) > MAX_LENGTH else text
+                    truncated = (
+                        text[:MAX_LENGTH] + "..." if len(text) > MAX_LENGTH else text
+                    )
                     return ToolResult(output=truncated)
 
                 elif action == "execute_js":
                     if not script:
-                        return ToolResult(error="Script is required for 'execute_js' action")
+                        return ToolResult(
+                            error="Script is required for 'execute_js' action"
+                        )
                     result = await context.evaluate_js(script)
                     return ToolResult(output=str(result))
 
@@ -251,7 +255,9 @@ class BrowserUseTool(BaseTool):
 
                 elif action == "switch_tab":
                     if tab_id is None:
-                        return ToolResult(error="Tab ID is required for 'switch_tab' action")
+                        return ToolResult(
+                            error="Tab ID is required for 'switch_tab' action"
+                        )
                     await context.switch_to_tab(tab_id)
                     return ToolResult(output=f"Switched to tab {tab_id}")
 
@@ -268,7 +274,7 @@ class BrowserUseTool(BaseTool):
                 elif action == "refresh":
                     await context.refresh()
                     return ToolResult(output="Refreshed current tab")
-                elif action == 'read_links':
+                elif action == "read_links":
                     links = await context.get_links()
                     return ToolResult(output=json.dumps(links))
 
@@ -280,8 +286,7 @@ class BrowserUseTool(BaseTool):
                 return ToolResult(error=str(e))
 
             finally:
-                await self.cleanup() #cleanup after every execute
-
+                await self.cleanup()  # cleanup after every execute
 
     async def cleanup(self):
         """Clean up browser and context."""

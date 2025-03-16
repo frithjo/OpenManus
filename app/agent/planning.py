@@ -5,13 +5,13 @@ from typing import Dict, List, Optional
 
 from pydantic import Field, model_validator
 
-from app.llm import LLM
 from app.agent.toolcall import ToolCallAgent
+from app.config import Config
+from app.llm import LLM
 from app.logger import logger
 from app.prompt.planning import NEXT_STEP_PROMPT, PLANNING_SYSTEM_PROMPT
-from app.schema import Message, ToolCall, ToolChoice, Step
+from app.schema import Message, ToolCall, ToolChoice
 from app.tool import PlanningTool, Terminate, ToolCollection
-from app.config import Config
 
 
 class PlanningAgent(ToolCallAgent):
@@ -28,7 +28,9 @@ class PlanningAgent(ToolCallAgent):
     system_prompt: str = PLANNING_SYSTEM_PROMPT
     next_step_prompt: str = NEXT_STEP_PROMPT
 
-    available_tools: ToolCollection = Field(default_factory=lambda: ToolCollection([PlanningTool(), Terminate()]))
+    available_tools: ToolCollection = Field(
+        default_factory=lambda: ToolCollection([PlanningTool(), Terminate()])
+    )
     tool_choices: ToolChoice = ToolChoice.AUTO  # type: ignore
     special_tool_names: List[str] = Field(default_factory=lambda: [Terminate().name])
 
@@ -42,7 +44,7 @@ class PlanningAgent(ToolCallAgent):
 
     max_steps: int = 20
 
-    def __init__(self, llm: LLM, config:Config):
+    def __init__(self, llm: LLM, config: Config):
         """
         Initialize the PlanningAgent.
 
@@ -52,9 +54,15 @@ class PlanningAgent(ToolCallAgent):
         """
         system_prompt = PLANNING_SYSTEM_PROMPT
         next_step_prompt = NEXT_STEP_PROMPT
-        tools = [PlanningTool(), Terminate()] # Define the tools
-        self.config = config # Add the config
-        super().__init__(llm=llm, system_prompt=system_prompt, next_step_prompt=next_step_prompt, available_tools=ToolCollection(tools), config=config)
+        tools = [PlanningTool(), Terminate()]  # Define the tools
+        self.config = config  # Add the config
+        super().__init__(
+            llm=llm,
+            system_prompt=system_prompt,
+            next_step_prompt=next_step_prompt,
+            available_tools=ToolCollection(tools),
+            config=config,
+        )
 
     @model_validator(mode="after")
     def check_tools(self) -> "PlanningAgent":
@@ -71,12 +79,14 @@ class PlanningAgent(ToolCallAgent):
             logger.error("No active plan ID.  Cannot think.")
             return False
 
-        prompt = f"CURRENT PLAN STATUS:\n{await self.get_plan()}\n\n{self.next_step_prompt}"
+        prompt = (
+            f"CURRENT PLAN STATUS:\n{await self.get_plan()}\n\n{self.next_step_prompt}"
+        )
 
-        self.update_memory("user", prompt) # Add to memory
+        self.update_memory("user", prompt)  # Add to memory
         # Get the current step index before thinking
         self.current_step_index = await self._get_current_step_index()
-        result = await super().think() # Call super().think
+        result = await super().think()  # Call super().think
 
         # After thinking, if we decided to execute a tool and it's not a planning tool or special tool,
         # associate it with the current step for tracking
@@ -180,10 +190,14 @@ class PlanningAgent(ToolCallAgent):
             return None
         try:
             planning_tool = self.available_tools.get_tool("planning")
-            plan = planning_tool.plans.get(self.active_plan_id) # Access plan using get()
+            plan = planning_tool.plans.get(
+                self.active_plan_id
+            )  # Access plan using get()
             if plan is None:
-                logger.warning(f"Plan with id {self.active_plan_id} not found in get_current_step")
-                return None # Or raise, depending on how critical this is
+                logger.warning(
+                    f"Plan with id {self.active_plan_id} not found in get_current_step"
+                )
+                return None  # Or raise, depending on how critical this is
             for i, step in enumerate(plan["steps"]):
                 if step.status in ("not_started", "in_progress"):
                     # Mark current step as in_progress
@@ -233,7 +247,9 @@ class PlanningAgent(ToolCallAgent):
         )
         content = response.content if response.content is not None else ""
 
-        assistant_msg = Message.assistant_message(content=content, tool_calls=response.tool_calls)
+        assistant_msg = Message.assistant_message(
+            content=content, tool_calls=response.tool_calls
+        )
         self.memory.add_message(assistant_msg)
 
         plan_created = False
@@ -243,11 +259,10 @@ class PlanningAgent(ToolCallAgent):
                     # Parse arguments using json.loads
                     tool_input = json.loads(tool_call.function.arguments)
                     # Add the plan_id to the tool input.
-                    tool_input['plan_id'] = self.active_plan_id # Add the plan id
+                    tool_input["plan_id"] = self.active_plan_id  # Add the plan id
                     result = await self.available_tools.execute(
                         name=tool_call.function.name, tool_input=tool_input
                     )
-
 
                     logger.info(
                         f"Executed tool {tool_call.function.name} with result: {result}"

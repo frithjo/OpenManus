@@ -1,5 +1,7 @@
-import requests
 from itertools import cycle
+
+import requests
+
 
 class ProxyManager:
     def __init__(self):
@@ -16,5 +18,6 @@ class ProxyManager:
     def get_proxy(self):
         """Return the next proxy in the cycle."""
         return next(self.proxy_pool)
+
 
 proxy_manager = ProxyManager()

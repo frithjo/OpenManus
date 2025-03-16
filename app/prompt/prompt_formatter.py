@@ -1,7 +1,9 @@
 # app/prompt/prompt_formatter.py
 
-from jinja2 import Environment, FileSystemLoader, TemplateNotFound, StrictUndefined
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any
+
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateNotFound
+
 
 def format_prompt(template_name: str, **kwargs: Any) -> str:
     """
@@ -21,7 +23,9 @@ def format_prompt(template_name: str, **kwargs: Any) -> str:
     kwargs.setdefault("format_instructions", "")
     kwargs.setdefault("json_start", "")
     kwargs.setdefault("json_end", "")
-    env = Environment(loader=FileSystemLoader("app/prompt/templates"), undefined=StrictUndefined)
+    env = Environment(
+        loader=FileSystemLoader("app/prompt/templates"), undefined=StrictUndefined
+    )
     try:
         # Load the template
         template = env.get_template(f"{template_name}.jinja")

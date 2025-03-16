@@ -1,6 +1,7 @@
 # app/prompt/message.py
-from app.schema import Message
 from app.prompt.base import PromptTemplate
+from app.schema import Message
+
 
 class MessagePrompt:
     """
@@ -8,6 +9,7 @@ class MessagePrompt:
 
     This class uses a PromptTemplate to format user input and conversation history.
     """
+
     def __init__(self, template: str):
         """
         Initialize a MessagePrompt instance.

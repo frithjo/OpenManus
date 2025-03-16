@@ -1,12 +1,12 @@
 # app/agent/base.py
 from abc import ABC, abstractmethod
-from typing import  Optional
+from typing import Optional
 
+from app.config import Config
 from app.llm import LLM  # Corrected import: Use the existing LLM class
 from app.logger import logger
+from app.prompt.message import MessagePrompt  # Corrected import
 from app.schema import AgentState, Memory, Message  # Corrected import
-from app.prompt.message import MessagePrompt # Corrected import
-from app.config import Config
 
 
 class Agent(ABC):
@@ -22,21 +22,21 @@ class Agent(ABC):
     llm: LLM
     memory: Memory = Memory()
     state: AgentState = AgentState.IDLE
-    
 
-    def __init__(self, llm: LLM, config:Config):
+    def __init__(self, llm: LLM, config: Config):
         """Initialize the agent with an LLM."""
         self.llm = llm
         self.config = config
-        self.message_prompt : MessagePrompt = MessagePrompt(
-        """
+        self.message_prompt: MessagePrompt = MessagePrompt(
+            """
         {{- history -}}
         {% if history -%}
         {{user_input}}
         {%- else -%}
         {{user_input}}
         {%- endif -%}
-        """)
+        """
+        )
 
     @abstractmethod
     async def think(self) -> bool:
@@ -79,7 +79,9 @@ class Agent(ABC):
                 break
 
             if result:
-                self.memory.add_message(self.message_prompt.assistant_message(content=result))
+                self.memory.add_message(
+                    self.message_prompt.assistant_message(content=result)
+                )
 
         return result
 
@@ -103,7 +105,7 @@ class Agent(ABC):
         elif role == "system":
             msg = Message.system_message(content)
         elif role == "assistant":
-            msg = Message.assistant_message(content, **kwargs) #type: ignore
+            msg = Message.assistant_message(content, **kwargs)  # type: ignore
         elif role == "tool":
             msg = Message.tool_message(content=content, **kwargs)
         else:

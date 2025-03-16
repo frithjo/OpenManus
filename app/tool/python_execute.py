@@ -1,7 +1,8 @@
 # app/tool/python_execute.py
+import multiprocessing
 import sys
 from io import StringIO
-import multiprocessing
+
 from app.tool.base import BaseTool, ToolResult
 
 
@@ -21,7 +22,9 @@ class PythonExecute(BaseTool):
         "required": ["code"],
     }
 
-    def _run_code(self, code: str, result_queue: multiprocessing.Queue, safe_globals: dict) -> None:
+    def _run_code(
+        self, code: str, result_queue: multiprocessing.Queue, safe_globals: dict
+    ) -> None:
         """Executes Python code in a sandboxed environment and captures stdout and return value."""
         original_stdout = sys.stdout
         try:
@@ -31,9 +34,13 @@ class PythonExecute(BaseTool):
             # Execute the code and capture the return value
             locales = {}
             exec(code, safe_globals, locales)
-            return_value = locales.get("result", None)  # Capture return value from 'result' variable
+            return_value = locales.get(
+                "result", None
+            )  # Capture return value from 'result' variable
 
-            result_queue.put((return_value, output_buffer.getvalue(), True))  # Send both
+            result_queue.put(
+                (return_value, output_buffer.getvalue(), True)
+            )  # Send both
 
         except Exception as e:
             result_queue.put((None, str(e), False))  # Send error information
@@ -43,7 +50,7 @@ class PythonExecute(BaseTool):
     async def execute(
         self,
         code: str,
-        timeout: int = 5, # Added type hint
+        timeout: int = 5,  # Added type hint
     ) -> ToolResult:
         """
         Executes the provided Python code with a timeout.
@@ -64,8 +71,7 @@ class PythonExecute(BaseTool):
                 safe_globals = {"__builtins__": __builtins__.__dict__.copy()}
 
             proc = multiprocessing.Process(
-                target=self._run_code,
-                args=(code, result_queue, safe_globals)
+                target=self._run_code, args=(code, result_queue, safe_globals)
             )
             proc.start()
             proc.join(timeout)
@@ -76,15 +82,23 @@ class PythonExecute(BaseTool):
                 return ToolResult(
                     output=None,
                     error=f"Execution timed out after {timeout} seconds",
-                    system=f"Execution timed out after {timeout} seconds" #Added system message
+                    system=f"Execution timed out after {timeout} seconds",  # Added system message
                 )
 
             try:
-                return_value, stdout, success = result_queue.get(block=False)  # Non-blocking get
+                return_value, stdout, success = result_queue.get(
+                    block=False
+                )  # Non-blocking get
                 if success:
-                    return ToolResult(output=return_value, system=stdout) #stdout saved in system
+                    return ToolResult(
+                        output=return_value, system=stdout
+                    )  # stdout saved in system
                 else:
-                    return ToolResult(output=None, error=stdout, system=stdout) #stdout saved in system
+                    return ToolResult(
+                        output=None, error=stdout, system=stdout
+                    )  # stdout saved in system
 
             except Exception:
-                return ToolResult(output=None, error="Failed to retrieve results from subprocess.")
+                return ToolResult(
+                    output=None, error="Failed to retrieve results from subprocess."
+                )

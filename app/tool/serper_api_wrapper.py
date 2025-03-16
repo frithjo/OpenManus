@@ -1,11 +1,12 @@
 # app/tool/serper_api_wrapper.py
 import os
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 import aiohttp
 from dotenv import load_dotenv
 
 from app.logger import logger  # Import the logger
+
 
 # Load environment variables
 load_dotenv()
@@ -69,7 +70,6 @@ class SerperAPIWrapper:
             except Exception as e:
                 logger.exception(f"An unexpected error occurred: {e}")
                 raise
-
 
     async def search(self, query: str) -> str:
         """Alias for the results method (for backwards compatibility)"""

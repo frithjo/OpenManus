@@ -1,9 +1,9 @@
 """Collection classes for managing multiple tools."""
-from typing import Any, Dict, List, Union, Optional
+import json
+from typing import Any, Dict, List, Optional, Union
 
 from app.exceptions import ToolError
 from app.tool.base import BaseTool, ToolFailure, ToolResult
-import json
 
 
 class ToolCollection:
@@ -52,9 +52,9 @@ class ToolCollection:
                 result = await tool.execute()
             return result
         except ToolError as e:
-            return ToolFailure(error=e.message) # Corrected: Access e.message
+            return ToolFailure(error=e.message)  # Corrected: Access e.message
         except Exception as e:
-           return ToolFailure(error=str(e))
+            return ToolFailure(error=str(e))
 
     async def execute_all(self) -> List[ToolResult]:
         """Execute all tools in the collection sequentially."""
@@ -62,7 +62,7 @@ class ToolCollection:
         for tool in self.tools:
             try:
                 result = await tool()
-                results.append(result) #type: ignore
+                results.append(result)  # type: ignore
             except ToolError as e:
                 results.append(ToolFailure(error=e.message))
         return results

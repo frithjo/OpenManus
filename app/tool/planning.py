@@ -1,11 +1,12 @@
 # app/tool/planning.py
 import json
 import os
-from typing import Dict, List, Literal, Optional, ClassVar  # Import ClassVar
+from typing import ClassVar, Dict, List, Literal, Optional  # Import ClassVar
 
 from app.exceptions import ToolError
 from app.schema import Step  # Import the Step model
 from app.tool.base import BaseTool, ToolResult
+
 
 _PLANNING_TOOL_DESCRIPTION = """
 A planning tool that allows the agent to create and manage plans for solving complex tasks.
@@ -70,7 +71,9 @@ class PlanningTool(BaseTool):
 
     plans: Dict[str, Dict] = {}  # Dictionary to store plans by plan_id
     _current_plan_id: Optional[str] = None  # Track the current active plan
-    PLANS_DIR: ClassVar[str] = "plans"  # Directory to store plan files.  Now with ClassVar
+    PLANS_DIR: ClassVar[
+        str
+    ] = "plans"  # Directory to store plan files.  Now with ClassVar
 
     def __init__(self):
         super().__init__()
@@ -103,8 +106,9 @@ class PlanningTool(BaseTool):
                     print(f"Error loading plan {plan_id} from {filename}: {e}")
                     # Consider more robust error handling, like moving the corrupted file
                 except Exception as e:
-                    print(f"Unexpected Error: loading plan {plan_id} from {filename}: {e}")
-
+                    print(
+                        f"Unexpected Error: loading plan {plan_id} from {filename}: {e}"
+                    )
 
     def _save_plan(self, plan: Dict):
         """Saves a plan to a JSON file."""
@@ -122,7 +126,6 @@ class PlanningTool(BaseTool):
             raise ToolError(f"Failed to save plan {plan_id}: {e}")
         except Exception as e:
             print(f"Unexpected Error: saving plan {plan_id}: {e}")
-
 
     async def execute(
         self,
@@ -207,7 +210,7 @@ class PlanningTool(BaseTool):
 
         self.plans[plan_id] = new_plan
         self._current_plan_id = plan_id  # Set as active plan
-        self._save_plan(new_plan) # save the plan
+        self._save_plan(new_plan)  # save the plan
 
         return ToolResult(
             output=f"Plan created successfully with ID: {plan_id}\n\n{self._format_plan(new_plan)}"
@@ -239,7 +242,10 @@ class PlanningTool(BaseTool):
             # Create new Step objects, preserving status/notes if possible
             new_steps = []
             for i, new_step_description in enumerate(steps):
-                if i < len(plan["steps"]) and plan["steps"][i].description == new_step_description:
+                if (
+                    i < len(plan["steps"])
+                    and plan["steps"][i].description == new_step_description
+                ):
                     # Reuse the existing Step object
                     new_steps.append(plan["steps"][i])
                 else:
@@ -247,7 +253,7 @@ class PlanningTool(BaseTool):
                     new_steps.append(Step(description=new_step_description))
 
             plan["steps"] = new_steps
-        self._save_plan(plan) # save the plan
+        self._save_plan(plan)  # save the plan
         return ToolResult(
             output=f"Plan updated successfully: {plan_id}\n\n{self._format_plan(plan)}"
         )
@@ -338,11 +344,13 @@ class PlanningTool(BaseTool):
             )
 
         if step_status:
-            plan["steps"][step_index].status = step_status  # Update status on Step object
+            plan["steps"][
+                step_index
+            ].status = step_status  # Update status on Step object
 
         if step_notes is not None:  # Allow clearing notes by passing an empty string
             plan["steps"][step_index].notes = step_notes  # Update notes on Step object
-        self._save_plan(plan) # save
+        self._save_plan(plan)  # save
         return ToolResult(
             output=f"Step {step_index} updated in plan '{plan_id}'.\n\n{self._format_plan(plan)}"
         )
@@ -399,7 +407,9 @@ class PlanningTool(BaseTool):
                 "in_progress": "[→]",
                 "completed": "[✓]",
                 "blocked": "[!]",
-            }.get(step.status, "[ ]")  # Access status from Step object
+            }.get(
+                step.status, "[ ]"
+            )  # Access status from Step object
             output += f"{i}. {status_symbol} {step.description}\n"  # Access description from Step object
             if step.notes:
                 output += f"    Notes: {step.notes}\n"  # Access notes from Step object

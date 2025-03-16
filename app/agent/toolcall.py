@@ -1,6 +1,6 @@
 # app/agent/toolcall.py
 import json
-from typing import List
+from typing import List, Optional, Tuple
 from pydantic import Field
 
 from app.agent.base import Agent
@@ -9,8 +9,10 @@ from app.logger import logger
 from app.prompt.prompt_formatter import format_prompt
 from app.schema import Message, ToolCall, ToolChoice
 from app.tool import ToolCollection, ToolResult, Terminate
-from app.tool.base import ToolFailure #add this import
+from app.tool.base import ToolFailure  # add this import
 from app.config import Config
+from app.prompt.tool_use import FORMAT_INSTRUCTIONS, JSON_END, JSON_START
+
 
 class ToolCallAgent(Agent):
     """
@@ -23,6 +25,7 @@ class ToolCallAgent(Agent):
     system_prompt: str
     next_step_prompt: str
     available_tools: ToolCollection
+    tool_choices: ToolChoice = ToolChoice.AUTO  # type: ignore
     special_tool_names: List[str] = Field(default_factory=list)
     tool_calls: List[ToolCall] = Field(default_factory=list)
     config: Config
@@ -34,11 +37,13 @@ class ToolCallAgent(Agent):
         next_step_prompt: str,
         available_tools: ToolCollection,
         config: Config,
+        tool_choices: ToolChoice = ToolChoice.AUTO,  # type: ignore
     ) -> None:
         super().__init__(llm=llm, config=config)
         self.system_prompt = system_prompt
         self.next_step_prompt = next_step_prompt
         self.available_tools = available_tools
+        self.tool_choices = tool_choices
         self.special_tool_names = [Terminate().name]
 
     async def think(self) -> bool:
@@ -59,10 +64,10 @@ class ToolCallAgent(Agent):
 
         # Format next_step_prompt and add to memory
         prompt = format_prompt(
-             "message",
-             user_input=self.next_step_prompt,
-             history=self.memory.to_dict_list(),
-         )
+            "message",
+            user_input=self.next_step_prompt,
+            history=self.memory.to_dict_list(),
+        )
         self.memory.add_message(Message.user_message(prompt))
 
         # Call the LLM
@@ -98,6 +103,7 @@ class ToolCallAgent(Agent):
         Returns:
             str: The result of the tool execution.
         """
+        logger.info("Agent is calling the act method")
         messages = self.memory.get_messages()
         last_message = messages[-1]
 

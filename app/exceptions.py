@@ -6,6 +6,7 @@ class ToolError(Exception):
         self.message = message
         super().__init__(self.message)
 
+
 class AgentError(Exception):
     """Custom exception for agent-related errors."""
 
@@ -32,6 +33,7 @@ class MemoryError(Exception):
 
 class SchemaError(Exception):
     """Custom exception for schema-related errors."""
+
     def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)

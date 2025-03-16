@@ -1,9 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
-
-
 
 class ToolResult:
     """
@@ -16,11 +13,17 @@ class ToolResult:
     """
 
     def __init__(
-        self, output: Optional[Any] = None, error: Optional[str] = None, system: Optional[str] = None
+        self,
+        output: Optional[Any] = None,
+        error: Optional[str] = None,
+        system: Optional[str] = None,
     ):
-        self.output = str(output) if output is not None else None  # Convert output to string
+        self.output = (
+            str(output) if output is not None else None
+        )  # Convert output to string
         self.error = error
         self.system = system
+
 
 class BaseTool(ABC):
     """Abstract base class for tools."""
